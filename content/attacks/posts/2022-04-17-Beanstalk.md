@@ -1,7 +1,7 @@
 ---
 date: 2022-04-17
-custodians: Beanstalk Farms
-categories: DeFi
+attacks/posts/custodians: Beanstalk Farms
+attacks/posts/categories: DeFi
 title: Beanstalk Farms Lost $182 Million Due To The Governance Mechanism
 ---
 

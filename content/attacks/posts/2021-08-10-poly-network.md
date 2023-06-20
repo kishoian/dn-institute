@@ -1,6 +1,6 @@
 ---
 date: 2021-08-10
-categories: DeFi
+attacks/posts/categories: DeFi
 title: Poly Network Exploited
 ---
 

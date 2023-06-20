@@ -1,7 +1,7 @@
 ---
 date: 2020-01-23
-custodians: Bitcoin Gold
-categories: 51%
+attacks/posts/custodians: Bitcoin Gold
+attacks/posts/categories: 51%
 title: Bitcoin Gold suffers a 51% attack again
 ---
 
