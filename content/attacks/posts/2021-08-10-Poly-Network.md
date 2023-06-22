@@ -2,7 +2,7 @@
 date: 2021-08-10
 custodians: Poly Network
 categories: Protocol exploit
-title: Poly Network Hack - $610 Million Stolen in 2021
+title: "Poly Network Hack - $610 Million Stolen in 2021"
 ---
 
 ## Summary
