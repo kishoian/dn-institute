@@ -1,0 +1,76 @@
+{
+  "pool_log_partitions": [
+    {
+      "start": 15670000,
+      "end": 15682500,
+      "events": 102
+    },
+    {
+      "start": 15682501,
+      "end": 15688750,
+      "events": 696
+    },
+    {
+      "start": 15688751,
+      "end": 15695000,
+      "events": 354
+    }
+  ],
+  "pool_events": 1152,
+  "pool_swaps": 484,
+  "pool_sync_events": 503,
+  "main_account_history_outgoing": 67,
+  "main_account_focus_transactions": 48,
+  "main_account_method_counts": {
+    "approve:ok": 6,
+    "deposit:ok": 4,
+    "borrow:ok": 28,
+    "swapExactInputForOutput:ok": 9,
+    "swapExactInputForOutput:error": 1
+  },
+  "main_pool_buys": 9,
+  "main_borrow_events": 28,
+  "main_deposit_events": 4,
+  "main_mCELO_net_input": "1928080.059343750418620429",
+  "main_MOO_pool_output": "5402573.894965393211674196",
+  "deposit_totals": {
+    "MOO": "5667812.567853493328201649"
+  },
+  "borrow_totals": {
+    "CELO": "10575110.299",
+    "MOO": "251786.27",
+    "cEUR": "765106.12",
+    "cUSD": "644523.14"
+  },
+  "oracle_initial": "0.023772963521064577",
+  "oracle_final": "4.814632503019011982",
+  "oracle_final_to_initial": "202.525549612394640984595501969816772524096245689970048422979",
+  "pool_initial": "0.0237727839950719825134473389896114629790268175604315056096554",
+  "pool_after_last_main_buy": "5.21718031987716452515189622683736649062114374429136781588180",
+  "pool_change_factor": "219.460216395297593632725294663270029736703591846784498598596",
+  "last_main_buy_utc": "2022-10-18T16:20:49+00:00",
+  "last_borrow_utc": "2022-10-18T16:25:24.000000Z",
+  "borrows_after_last_main_buy": 7,
+  "borrow_totals_after_last_main_buy": {
+    "CELO": "2929117.669",
+    "MOO": "251786.27",
+    "cEUR": "765106.12",
+    "cUSD": "644523.14"
+  },
+  "other_pool_swaps_in_focus": 204,
+  "other_swap_direction_counts": {
+    "sell_MOO": 141,
+    "buy_MOO": 63
+  },
+  "other_net_mCELO_to_pool": "-291440.750455251734513407",
+  "first_buy_to_next_pre_price_decline_pct": "-21.2066647526575886386039519245804261986686701415661808002454",
+  "limitations": [
+    "One historical event, selected after public reporting; no prevalence or population inference.",
+    "Historical logs and traces come from one indexer, not independent archive-node replay or receipt inclusion proofs.",
+    "Other transaction origins are not proof of independent beneficial owners or arbitrage motives.",
+    "Pool net mCELO inputs include accrued interest/dust and are not a wallet cash-cost estimate.",
+    "Borrow totals are gross token credits, not profit, net loss, or a dollar-denominated damage estimate.",
+    "The underlying sliding-window contract is not source-verified in the captured explorer response; no exact averaging horizon is claimed.",
+    "Oracle quotes are observed at borrowing transactions, not a continuous historical oracle time series."
+  ]
+}

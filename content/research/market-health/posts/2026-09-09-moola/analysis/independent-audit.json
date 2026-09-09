@@ -1,0 +1,11 @@
+{
+  "source_files_checked": 158,
+  "pool_events_checked": 1152,
+  "pool_swaps_checked": 484,
+  "sync_states_checked": 503,
+  "loan_calldata_and_oracle_returns_checked": 28,
+  "main_buys_checked": 9,
+  "post_last_purchase_loans_checked": 7,
+  "headline_reconciliation": "pass",
+  "limitation": "Independent implementation on the same saved indexer evidence, not independent provider corroboration."
+}

@@ -1,0 +1,99 @@
+Moola pool/oracle/loan reconstruction
+===================================
+
+Run from this article directory with Python 3.10 or later:
+
+    python3 analyze.py
+    python3 independent_audit.py
+
+Both commands are offline. The first validates the archive SHA-256, entry list
+and individual compressed response hashes before deriving CSVs. The second
+checks source hashes and implements separate event/rational-arithmetic,
+calldata and oracle-return comparisons. Failed checks raise explicit exceptions
+even with python -O. A successful audit does not corroborate the data provider.
+
+Optional figures and notebook require matplotlib/numpy and Jupyter:
+
+    python3 -m pip install matplotlib numpy nbformat nbclient ipykernel
+    python3 plot.py
+
+The published notebook was executed with Python 3.12.6; figures were checked
+with matplotlib 3.10.0 and numpy 2.4.3. Figures use matplotlib;
+plotting does not participate in integer or rational evidence checks. Numerical
+CSVs and SVGs are deterministic in the recorded environment. Rendering can vary
+with plotting-library and font versions.
+
+Sources and selection
+---------------------
+sources.zip contains the original gzip-compressed response envelopes under raw/.
+Do not unpack over a working collector cache. analyze.py reads entries directly
+without extraction. manifest.json lists their SHA-256 values and the ZIP hash.
+The archive is 158 responses: historical transaction metadata, paginated logs,
+borrow traces, account and pool queries, contract metadata/source responses, and
+current token-identity/decimal RPC calls. URLs and retrieval times are recorded
+inside each envelope. Metadata such as confirmations and labels reflects the
+2026 retrieval, not the historical event; calculations use event/block fields.
+
+Historical source: https://explorer.celo.org/mainnet
+  /api/v2/transactions/{transaction_hash}
+  /api/v2/transactions/{transaction_hash}/logs
+  /api/v2/transactions/{transaction_hash}/raw-trace
+  /api/v2/smart-contracts/{address}
+  /api?module=logs&action=getLogs&address=...&fromBlock=...&toBlock=...
+  /api?module=account&action=txlist&address=...&startblock=...&endblock=...&sort=asc
+
+Current identity/decimal calls: https://forno.celo.org (eth_call, latest).
+These are token ordering/units checks, not historical state or oracle queries.
+All economic oracle observations come from historical transaction traces.
+
+An initial public chronology supplied 49 transaction hashes. Additional account
+queries supplied eight omitted main-account transactions (including one deposit
+and one failed swap). Main-account selection is independently reconciled to the
+complete 67-outgoing-transaction nonce sequence in the broad block window.
+The 48 outgoing transactions up to the last sampled loan define the focused
+episode. Two earlier loans by a different address remain in the source archive,
+but are not included in the 28-loan headline totals.
+
+The pool sample covers blocks 15,670,000 through 15,695,000. Responses reaching
+the source's 1,000-log cap were recursively split. The complete leaf ranges are
+15,670,000-15,682,500; 15,682,501-15,688,750; 15,688,751-15,695,000. Capped parent
+responses are retained for provenance and are never used as complete samples.
+Transaction logs follow next_page_params through exhaustion. These checks address
+known API truncation, not a guarantee that the indexer has every chain event.
+
+Definitions
+-----------
+Pool net input = amount1In - amount1Out, divided by 10^18.
+Pool net MOO flow = amount0In - amount0Out, divided by 10^18.
+Pre-swap balances = post-Sync reserves - amountIn + amountOut for each token.
+Reserve price = mCELO reserve / MOO reserve; this is not average fill price.
+The underlying mCELO token accrues interest. Small mCELO amounts counted as AMM
+input can occur on a net MOO sale. No zero-opposite-input filter is imposed.
+
+Borrow events, calldata and token Transfers must agree on asset and amount.
+Trace roots must agree with transaction origin, destination and calldata.
+The MOO getAssetPrice return must match the downstream one-MOO-to-mCELO quote.
+If multiple MOO oracle calls occur in one loan, every return must agree; the
+final MOO loan contains two such calls. Quotes are divided by 10^18.
+
+MoolaOracle uses CELO account-value units. Its provider passes through a source
+quote denominated in mCELO. The chart normalizes each series to its own baseline;
+it does not assert equivalence to a historical dollar price. The exact internal
+averaging horizon is not verified, and no synthetic oracle series is generated.
+
+Deposit totals are gross MOO collateral deposits, not a historical interest-
+adjusted collateral balance. Loan totals are gross credited tokens, not losses,
+profit or a protocol-wide drain. Other transactions are not assigned to owners.
+
+Publication scope
+-----------------
+This is exploratory historical work. It was selected after an exchange-trade
+pilot could establish repeated quantities but not manipulative conduct. Earlier
+closed Moola submissions #1023 and #1089 were reviewed for topic overlap. This
+bundle contributes original pool-event and actual loan-trace measurements; it
+does not reuse their incident-summary datasets or reported-dollar-loss charts.
+
+To refresh evidence, collect into a separate directory using the exact recorded
+requests and preserve the published archive. Historical metadata and providers
+can change. A refreshed source set needs its own manifest and full validation;
+do not regenerate a checksum merely to suppress an integrity failure.
