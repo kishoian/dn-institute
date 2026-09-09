@@ -8,7 +8,7 @@ from pathlib import Path
 import tempfile
 import subprocess
 import sys
-from evidence import checked_result
+from evidence import checked_result, publish_snapshot
 
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "data"
@@ -20,7 +20,6 @@ def main():
         raise ValueError("No raw evidence found; existing archive and manifest were left unchanged")
     counts, endpoints, times = collections.Counter(), collections.Counter(), []
     path = DATA / "evidence.jsonl.gz"
-    # Same-filesystem temporary files allow atomic replacement of each file.
     # Any parse, validation or dependency failure leaves both originals intact.
     with tempfile.TemporaryDirectory(prefix=".evidence-", dir=DATA) as temporary:
         staging = Path(temporary)
@@ -50,8 +49,7 @@ def main():
                                 capture_output=True, text=True)
         if replay.returncode:
             raise ValueError("Staged evidence is not replayable: " + replay.stderr[-2000:])
-        packed.replace(path)
-        staged_manifest.replace(DATA / "manifest.json")
+        manifest = publish_snapshot(staging, DATA)
     print(json.dumps(manifest, indent=2))
 
 

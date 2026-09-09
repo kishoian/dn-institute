@@ -8,10 +8,11 @@ import collections
 import csv
 from decimal import Decimal, getcontext
 from fractions import Fraction
-import gzip
 import json
 from pathlib import Path
+from evidence import require
 import statistics
+from evidence import load_archive
 
 getcontext().prec = 70
 DATA = Path(__file__).resolve().parent / "data"
@@ -27,8 +28,7 @@ def words(log):
 
 
 def main():
-    with gzip.open(DATA / "evidence.jsonl.gz", "rt") as stream:
-        evidence = {r["name"]: r["response"]["result"] for r in map(json.loads, stream)}
+    evidence = {name: row["result"] for name, row in load_archive(DATA).items()}
     with (DATA / "episodes.csv").open() as stream:
         episodes = list(csv.DictReader(stream))
     with (DATA / "victims.csv").open() as stream:
@@ -37,37 +37,37 @@ def main():
     def pool_event(tx):
         logs = evidence["receipt-" + tx]["logs"]
         swaps = [l for l in logs if l["address"] == POOL and l["topics"][0] == SWAP]
-        assert len(swaps) == 1
+        require(len(swaps) == 1, 'Validation failed: len(swaps) == 1')
         event = swaps[0]
         preceding = [l for l in logs if l["address"] == POOL
                      and l["topics"][0] == SYNC
                      and int(l["logIndex"], 16) == int(event["logIndex"], 16) - 1]
-        assert len(preceding) == 1
+        require(len(preceding) == 1, 'Validation failed: len(preceding) == 1')
         return words(event), words(preceding[0])
 
     checked = 0
     for episode in episodes:
         front, post = pool_event(episode["front_tx"])
         back, _ = pool_event(episode["back_tx"])
-        assert front[2] == back[0]
+        require(front[2] == back[0], 'Validation failed: front[2] == back[0]')
         r0, r1 = post[0] + front[2] - front[0], post[1] + front[3] - front[1]
         rows = [p for p in purchases if p["episode_id"] == episode["episode_id"]]
-        assert len(rows) == int(episode["victim_count"])
+        require(len(rows) == int(episode["victim_count"]), 'Validation failed: len(rows) == int(episode["victim_count"])')
         for row in rows:
             observed, _ = pool_event(row["tx_hash"])
-            assert observed[0] == observed[3] == 0
-            assert observed[1] == int(row["input_raw"])
-            assert observed[2] == int(row["actual_output_raw"])
+            require(observed[0] == observed[3] == 0, 'Validation failed: observed[0] == observed[3] == 0')
+            require(observed[1] == int(row["input_raw"]), 'Validation failed: observed[1] == int(row["input_raw"])')
+            require(observed[2] == int(row["actual_output_raw"]), 'Validation failed: observed[2] == int(row["actual_output_raw"])')
             effective = Fraction(997, 1000) * observed[1]
             expected = int(Fraction(r0) * effective / (r1 + effective))
-            assert expected == int(row["counterfactual_output_raw"])
+            require(expected == int(row["counterfactual_output_raw"]), 'Validation failed: expected == int(row["counterfactual_output_raw"])')
             r0, r1 = r0 - expected, r1 + observed[1]
             checked += 1
         gas = sum(int(evidence["receipt-" + episode[role]]["gasUsed"], 16)
                   * int(evidence["receipt-" + episode[role]]["effectiveGasPrice"], 16)
                   for role in ("front_tx", "back_tx"))
-        assert Decimal(back[3] - front[1]) / 10**18 == Decimal(episode["pool_weth_margin"])
-        assert Decimal(gas) / 10**18 == Decimal(episode["outer_tx_gas_eth"])
+        require(Decimal(back[3] - front[1]) / 10**18 == Decimal(episode["pool_weth_margin"]), 'Validation failed: Decimal(back[3] - front[1]) / 10**18 == Decimal(episode["pool_weth_margin"])')
+        require(Decimal(gas) / 10**18 == Decimal(episode["outer_tx_gas_eth"]), 'Validation failed: Decimal(gas) / 10**18 == Decimal(episode["outer_tx_gas_eth"])')
 
     def median(rows):
         return str(statistics.median(Decimal(p["shortfall_bps"]) for p in rows))

@@ -91,9 +91,14 @@ study. Packing rejects an empty, malformed or incomplete cache before replacing
 anything, writes to temporary files, and executes the full replay against the
 staged archive before replacement. Token/factory identity checks are shared by
 the preflight and replay paths. Staging cannot modify the published CSV outputs.
-Each archive/manifest file is replaced atomically; they are not one transactional
-filesystem object. An interruption between the two replacements is detectable by
-the checksum check. Public endpoints may later impose limits;
+Changed snapshots receive immutable, SHA-256-named archive files; only the
+manifest pointer is replaced atomically. An interruption before that switch
+leaves the previous manifest and archive usable. Previous archives are retained;
+a no-op repack keeps the existing filename. Always use manifest.json to locate
+the active archive. When publishing a different dataset, update article download
+links to that filename. This is process-interruption safety, not a guarantee
+against storage-device failure. Evidence checks remain active under python -O.
+Public endpoints may later impose limits;
 the offline snapshot is the review source if refetching is unavailable.
 
 Historical reserves are initialized from the last Sync in the preceding 1,000

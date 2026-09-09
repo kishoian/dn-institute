@@ -5,6 +5,49 @@ import json
 from pathlib import Path
 
 
+def require(condition, message):
+    """Keep evidence checks active under python -O and PYTHONOPTIMIZE."""
+    if not condition:
+        raise ValueError(message)
+
+
+def publish_snapshot(staging, data):
+    """Publish immutable evidence, then atomically switch the manifest pointer.
+
+    Older archives remain readable. An interruption before the manifest switch
+    can leave an unreferenced new archive, but cannot invalidate the old pair.
+    """
+    manifest_path = staging / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    packed = staging / manifest["file"]
+    blob = packed.read_bytes()
+    require(hashlib.sha256(blob).hexdigest() == manifest["sha256"],
+            "Staged archive checksum mismatch before publication")
+    filename = f"evidence-{manifest['sha256']}.jsonl.gz"
+    current_path = data / "manifest.json"
+    if current_path.exists():
+        current = json.loads(current_path.read_text())
+        previous = current.get("file", "")
+        require(bool(previous) and Path(previous).name == previous,
+                "Current manifest must name a file in its own directory")
+        # Preserve the legacy filename and byte-identical manifest on a no-op
+        # repack; do not overwrite an archive referenced by an older manifest.
+        if current.get("sha256") == manifest["sha256"]:
+            require((data / previous).read_bytes() == blob,
+                    "Current archive differs from its declared checksum")
+            filename = previous
+    destination = data / filename
+    if destination.exists():
+        require(destination.read_bytes() == blob,
+                "Refusing to overwrite a different immutable evidence archive")
+    else:
+        packed.replace(destination)
+    manifest["file"] = filename
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+    manifest_path.replace(current_path)
+    return manifest
+
+
 def checked_result(name, envelope):
     if not isinstance(envelope, dict) or "error" in envelope:
         raise ValueError(f"Invalid RPC envelope for {name}")

@@ -9,6 +9,7 @@ import gzip
 import json
 import io
 from pathlib import Path
+from evidence import require
 import statistics
 from functools import lru_cache
 from evidence import checked_result, load_archive, named_result
@@ -46,7 +47,7 @@ def words(data):
 
 
 def amount_out(amount_in, reserve_in, reserve_out):
-    assert amount_in > 0 and reserve_in > 0 and reserve_out > 0
+    require(amount_in > 0 and reserve_in > 0 and reserve_out > 0, 'Validation failed: amount_in > 0 and reserve_in > 0 and reserve_out > 0')
     return amount_in * 997 * reserve_out // (reserve_in * 1000 + amount_in * 997)
 
 
@@ -79,14 +80,14 @@ def decode(read=None):
     for start in range(START, END+1, 1000):
         name = f"logs-{start}-{min(start+999, END)}"
         rows = read(name)
-        assert isinstance(rows, list), name
-        assert all(start <= int(l["blockNumber"], 16) <= min(start+999, END) for l in rows)
+        require(isinstance(rows, list), name)
+        require(all(start <= int(l["blockNumber"], 16) <= min(start+999, END) for l in rows), 'Validation failed: all(start <= int(l["blockNumber"], 16) <= min(start+999, END) for l in rows)')
         chunks.append({"first_block": start, "last_block": min(start+999, END), "event_count": len(rows)})
         logs.extend(rows)
     logs.sort(key=lambda l: (int(l["blockNumber"], 16), int(l["logIndex"], 16)))
     keys = {(l["blockHash"], l["logIndex"]) for l in logs}
-    assert len(keys) == len(logs), "Duplicate event keys"
-    assert all(not l["removed"] and l["address"] == POOL for l in logs)
+    require(len(keys) == len(logs), "Duplicate event keys")
+    require(all(not l["removed"] and l["address"] == POOL for l in logs), 'Validation failed: all(not l["removed"] and l["address"] == POOL for l in logs)')
     prior = [l for l in read("initial-sync-logs") if l["topics"][0] == SYNC]
     prior.sort(key=lambda l: (int(l["blockNumber"], 16), int(l["logIndex"], 16)))
     reserve = words(prior[-1]["data"])
@@ -100,10 +101,10 @@ def decode(read=None):
             sync_log = log
         elif topic == SWAP:
             a0in, a1in, a0out, a1out = words(log["data"])
-            assert sync_log["transactionHash"] == log["transactionHash"]
-            assert int(sync_log["logIndex"], 16) + 1 == int(log["logIndex"], 16)
+            require(sync_log["transactionHash"] == log["transactionHash"], 'Validation failed: sync_log["transactionHash"] == log["transactionHash"]')
+            require(int(sync_log["logIndex"], 16) + 1 == int(log["logIndex"], 16), 'Validation failed: int(sync_log["logIndex"], 16) + 1 == int(log["logIndex"], 16)')
             pre = (reserve[0]-a0in+a0out, reserve[1]-a1in+a1out)
-            assert pre == previous_reserve, "Reserve discontinuity / unaccounted transfer"
+            require(pre == previous_reserve, "Reserve discontinuity / unaccounted transfer")
             direction = "buy" if a1in > 0 and a0out > 0 and a0in == a1out == 0 else (
                         "sell" if a0in > 0 and a1out > 0 and a1in == a0out == 0 else "complex")
             swaps.append({"block": int(log["blockNumber"], 16), "tx_index": int(log["transactionIndex"], 16),
@@ -194,15 +195,15 @@ def main():
         receipts = [raw("receipt-"+s["tx"]) for s in seq]
         reason = "accepted"
         for s, tx, receipt in zip(seq, txs, receipts):
-            assert tx["hash"] == receipt["transactionHash"] == s["tx"]
-            assert tx["blockHash"] == receipt["blockHash"] == s["block_hash"]
-            assert int(tx["transactionIndex"], 16) == int(receipt["transactionIndex"], 16) == s["tx_index"]
-            assert int(receipt["status"], 16) == 1
+            require(tx["hash"] == receipt["transactionHash"] == s["tx"], 'Validation failed: tx["hash"] == receipt["transactionHash"] == s["tx"]')
+            require(tx["blockHash"] == receipt["blockHash"] == s["block_hash"], 'Validation failed: tx["blockHash"] == receipt["blockHash"] == s["block_hash"]')
+            require(int(tx["transactionIndex"], 16) == int(receipt["transactionIndex"], 16) == s["tx_index"], 'Validation failed: int(tx["transactionIndex"], 16) == int(receipt["transactionIndex"], 16) == s["tx_index"]')
+            require(int(receipt["status"], 16) == 1, 'Validation failed: int(receipt["status"], 16) == 1')
             matching = [l for l in receipt["logs"] if l["address"] == POOL
                         and int(l["logIndex"], 16) == s["log_index"]]
-            assert len(matching) == 1
-            assert matching[0]["topics"][0] == SWAP
-            assert words(matching[0]["data"]) == (s["a0in"], s["a1in"], s["a0out"], s["a1out"])
+            require(len(matching) == 1, 'Validation failed: len(matching) == 1')
+            require(matching[0]["topics"][0] == SWAP, 'Validation failed: matching[0]["topics"][0] == SWAP')
+            require(words(matching[0]["data"]) == (s["a0in"], s["a1in"], s["a0out"], s["a1out"]), 'Validation failed: words(matching[0]["data"]) == (s["a0in"], s["a1in"], s["a0out"], s["a1out"])')
         closure = abs(back["a0in"]-front["a0out"])
         # Primary analysis requires exact closure in PEPE base units.
         if txs[0]["from"] != txs[-1]["from"] or txs[0]["to"] != txs[-1]["to"]:
@@ -231,13 +232,13 @@ def main():
         used.update(s["tx"] for s in seq)
         episode_id = f'{front["block"]}-{front["tx_index"]}'
         block = raw(f'block-{front["block"]}')
-        assert block["hash"] == front["block_hash"]
+        require(block["hash"] == front["block_hash"], 'Validation failed: block["hash"] == front["block_hash"]')
         timestamp = dt.datetime.fromtimestamp(int(block["timestamp"], 16), dt.timezone.utc).isoformat()
         r0, r1 = front["pre0"], front["pre1"]
         for s, tx in zip(seq[1:-1], txs[1:-1]):
             out = amount_out(s["a1in"], r1, r0)
             shortfall = out - s["a0out"]
-            assert shortfall > 0
+            require(shortfall > 0, 'Validation failed: shortfall > 0')
             victims.append({"episode_id": episode_id, "block": s["block"], "timestamp_utc": timestamp,
                 "tx_index": s["tx_index"], "tx_hash": s["tx"], "origin": tx["from"],
                 "input_weth": dec(s["a1in"]), "actual_pepe": dec(s["a0out"]),
@@ -263,7 +264,7 @@ def main():
             "spot_after_front_weth_per_pepe": dec(front["post1"], front["post0"]),
             "spot_before_back_weth_per_pepe": dec(back["pre1"], back["pre0"]),
             "spot_after_back_weth_per_pepe": dec(back["post1"], back["post0"])})
-    assert episodes, "No qualifying episodes: report limitation instead of fabricating results"
+    require(episodes, "No qualifying episodes: report limitation instead of fabricating results")
     dump_csv("swaps.csv", swaps)
     dump_csv("screening.csv", screening)
     dump_csv("episodes.csv", episodes)

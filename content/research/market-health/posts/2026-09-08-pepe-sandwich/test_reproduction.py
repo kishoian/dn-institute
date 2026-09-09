@@ -1,11 +1,15 @@
 """Regression tests for evidence-loss and stale-cache failures; no network."""
 import contextlib
+import csv
 import gzip
 import hashlib
 import io
 import json
 from pathlib import Path
 import tempfile
+import shutil
+import subprocess
+import sys
 import unittest
 from unittest.mock import patch
 
@@ -120,11 +124,83 @@ class EvidenceRegressionTests(unittest.TestCase):
             self.assertEqual(analyze.SOURCE, "raw")
             return [], {}
         with (patch.object(analyze, "SOURCE", "archive"),
-              patch.object(analyze, "decode", side_effect=decode_raw),
+              patch.object(analyze, "decode", side_effect=decode_raw) as decode,
               patch.object(collect, "manifest"),
               patch("sys.argv", ["collect.py", "transactions"]),
               contextlib.redirect_stdout(io.StringIO())):
             collect.main()
+            decode.assert_called_once_with()
+
+    def test_corrupt_cache_is_refetched_and_valid_cache_reused(self):
+        path = self.raw / "sample.json.gz"
+        broken = [b"not gzip", gzip.compress(b"{") , gzip.compress(b"[]"),
+                  gzip.compress(b"\xff"), gzip.compress(b"{}")[:-4]]
+        for blob in broken:
+            with self.subTest(blob=blob):
+                path.write_bytes(blob)
+                response = contextlib.nullcontext(io.BytesIO(b'{"result": ["fresh"]}'))
+                with (patch.object(collect, "RAW", self.raw),
+                      patch.object(collect.urllib.request, "urlopen", return_value=response) as fetch):
+                    self.assertEqual(collect.fetch("sample", "eth_getLogs", []), ["fresh"])
+                    fetch.assert_called_once()
+                with (patch.object(collect, "RAW", self.raw),
+                      patch.object(collect.urllib.request, "urlopen", side_effect=RuntimeError("Network forbidden"))):
+                    self.assertEqual(collect.fetch("sample", "eth_getLogs", []), ["fresh"])
+
+    def staged_snapshot(self):
+        staging = self.root / "staging"
+        staging.mkdir()
+        blob = gzip.compress((json.dumps({"name": "sample", "response": envelope(["new"])}) + "\n").encode())
+        (staging / self.archive.name).write_bytes(blob)
+        (staging / "manifest.json").write_text(json.dumps({"file": self.archive.name,
+            "sha256": hashlib.sha256(blob).hexdigest(), "records": 1}))
+        return staging
+
+    def test_interruption_before_manifest_switch_preserves_old_snapshot(self):
+        staging = self.staged_snapshot()
+        original_replace = Path.replace
+
+        class Interrupted(BaseException):
+            pass
+
+        def stop_before_switch(path, target):
+            if Path(target) == self.manifest:
+                raise Interrupted()
+            return original_replace(path, target)
+
+        with patch.object(Path, "replace", stop_before_switch):
+            with self.assertRaises(Interrupted):
+                evidence.publish_snapshot(staging, self.data)
+        self.assert_preserved()
+        self.assertEqual(evidence.named_result(evidence.load_archive(self.data), "sample"), ["old"])
+
+    def test_new_publication_preserves_prior_archive_and_switches_reader(self):
+        staging = self.staged_snapshot()
+        published = evidence.publish_snapshot(staging, self.data)
+        self.assertNotEqual(published["file"], self.archive.name)
+        self.assertEqual(self.archive.read_bytes(), self.before[0])
+        self.assertEqual(evidence.named_result(evidence.load_archive(self.data), "sample"), ["new"])
+
+    def test_optimized_python_rejects_corrupt_derived_output(self):
+        source = Path(analyze.__file__).resolve().parent
+        copied = self.root / "optimized-data"
+        shutil.copytree(source / "data", copied, ignore=shutil.ignore_patterns("raw"))
+        victims = copied / "victims.csv"
+        with victims.open() as stream:
+            rows = list(csv.DictReader(stream))
+        rows[0]["counterfactual_output_raw"] = str(int(rows[0]["counterfactual_output_raw"]) + 1)
+        with victims.open("w", newline="") as stream:
+            writer = csv.DictWriter(stream, fieldnames=rows[0].keys())
+            writer.writeheader()
+            writer.writerows(rows)
+        validation_before = (copied / "validation.json").read_bytes()
+        program = ("from pathlib import Path; import analyze, validate; "
+                   f"analyze.DATA = Path({str(copied)!r}); validate.main()")
+        result = subprocess.run([sys.executable, "-O", "-c", program],
+                                cwd=source, capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("ValueError: Validation failed: output ==", result.stderr)
+        self.assertEqual((copied / "validation.json").read_bytes(), validation_before)
 
 
 if __name__ == "__main__":

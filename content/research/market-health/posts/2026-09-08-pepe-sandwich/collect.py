@@ -7,8 +7,10 @@ import gzip
 import hashlib
 import json
 from pathlib import Path
+from evidence import require
 import time
 import urllib.request
+import zlib
 
 ROOT = Path(__file__).resolve().parent
 RAW = ROOT / "data" / "raw"
@@ -22,9 +24,13 @@ def fetch(name, method, params, endpoint=OTHER_RPC):
     RAW.mkdir(parents=True, exist_ok=True)
     path = RAW / (name + ".json.gz")
     if path.exists():
-        envelope = json.loads(gzip.decompress(path.read_bytes()))
-        cached = envelope.get("result")
-        if (envelope.get("method") == method and envelope.get("params") == params
+        try:
+            envelope = json.loads(gzip.decompress(path.read_bytes()))
+        except (gzip.BadGzipFile, EOFError, zlib.error, json.JSONDecodeError, UnicodeDecodeError):
+            envelope = None
+        cached = envelope.get("result") if isinstance(envelope, dict) else None
+        if (isinstance(envelope, dict) and "error" not in envelope
+                and envelope.get("method") == method and envelope.get("params") == params
                 and envelope.get("endpoint") == endpoint and valid(method, cached)):
             return cached
     payload = json.dumps({"jsonrpc": "2.0", "id": 1,
@@ -41,7 +47,9 @@ def fetch(name, method, params, endpoint=OTHER_RPC):
             envelope = {"endpoint": endpoint, "method": method, "params": params,
                         "retrieved_at_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
                         "result": value["result"]}
-            path.write_bytes(gzip.compress(json.dumps(envelope, separators=(",", ":")).encode(), mtime=0))
+            temporary = path.with_suffix(".tmp")
+            temporary.write_bytes(gzip.compress(json.dumps(envelope, separators=(",", ":")).encode(), mtime=0))
+            temporary.replace(path)
             return value["result"]
         except Exception:
             if attempt == 4:
@@ -117,7 +125,7 @@ def main():
             result = fetch(f"verify-receipt-{tx}", "eth_getTransactionReceipt", [tx], LOG_RPC)
             original = json.loads(gzip.decompress((RAW / f"receipt-{tx}.json.gz").read_bytes()))["result"]
             for key in ["blockHash", "transactionHash", "transactionIndex", "status", "gasUsed", "logs"]:
-                assert result[key] == original[key], (role, key)
+                require(result[key] == original[key], (role, key))
         print("Independent-provider receipt check passed")
     manifest()
 

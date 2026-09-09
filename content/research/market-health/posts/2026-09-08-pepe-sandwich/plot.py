@@ -63,7 +63,8 @@ def main():
         ax.text(x, y+.1, f"{y:.3f}", ha="center", fontsize=13, fontweight="bold")
     ax.set_xticks([0, 1, 2], ["Pool WETH\nmargin", "Outer-transaction\ngas (ETH)", "Difference before\nother transfers"])
     ax.set(ylim=(0, gross*1.22), ylabel="ETH-equivalent units (WETH at 1:1)")
-    ax.grid(axis="y", color=GRID); ax.set_axisbelow(True)
+    ax.grid(axis="y", color=GRID)
+    ax.set_axisbelow(True)
     fig.suptitle("Pool margin and transaction gas", x=.125, ha="left", fontsize=16, fontweight="bold")
     ax.set_title(f"{len(episodes)} exact-inventory sequences | {period} | not a net-profit estimate", fontsize=10, loc="left", pad=13, fontweight="normal")
     fig.text(.125, -.02, "Source: pool Swap amounts; receipt gasUsed × effectiveGasPrice. Internal/private payments are not measured.", fontsize=9)
@@ -90,14 +91,17 @@ def main():
     user_label = "After\nuser buy" if len(purchases) == 1 else "After\nuser buys"
     ax.set_xticks(range(4), ["Before", "After\nfront buy", user_label, "After\nback sell"])
     ax.set(ylabel="Marginal pool price index (before = 100)", ylim=(99.4, max(states)+1.2))
-    ax.grid(axis="y", color=GRID); ax.set_axisbelow(True)
+    ax.grid(axis="y", color=GRID)
+    ax.set_axisbelow(True)
     ax.set_title("Observed reserve states · focused index scale", fontsize=10, loc="left", fontweight="normal")
     ax = axes[1]
     ax.bar([0, 1], [actual, cf], color=[BLUE, "white"], edgecolor=[BLUE, INK], width=.55, lw=1.2)
-    for x, y in enumerate([actual, cf]): ax.text(x, y+2, f"{y:.3f}", ha="center", fontsize=11)
+    for x, y in enumerate([actual, cf]):
+        ax.text(x, y+2, f"{y:.3f}", ha="center", fontsize=11)
     ax.set_xticks([0, 1], ["Actual", "Replay without\nfront buy"])
     ax.set(ylabel="PEPE received (billions)", ylim=(0, max(actual, cf)*1.2))
-    ax.grid(axis="y", color=GRID); ax.set_axisbelow(True)
+    ax.grid(axis="y", color=GRID)
+    ax.set_axisbelow(True)
     ax.set_title(f"Same input: {float(v['input_weth']):.6f} WETH", fontsize=10, loc="left", fontweight="normal")
     fig.suptitle("A purchase bracketed by an exact-inventory round trip", x=.08, ha="left", fontsize=15, fontweight="bold")
     fig.text(.08, .89, f"Ethereum block {int(first['block']):,} · transaction indices {transaction_indices} · "
