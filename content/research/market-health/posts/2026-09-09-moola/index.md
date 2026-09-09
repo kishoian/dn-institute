@@ -11,7 +11,7 @@ entities:
 
 ## Summary
 
-The distinctive risk in Moola's 18 October 2022 episode was a connection between two markets: buying MOO moved the price in a small MOO/mCELO pool, while Moola used a quote sourced from that pool to value MOO in its lending system. This study reconstructs that connection from **1,152 pool events, including 484 swaps**, and the execution traces of **28 successful loans** made by one address.
+The distinctive risk in Moola's 18 October 2022 episode was a connection between two markets: buying MOO moved the price in a small MOO/mCELO pool, while Moola used a quote sourced from that pool to value MOO in its lending system. This study reconstructs that connection from **1,152 pool events, including 484 swaps**, and the execution traces of **28 successful loans** made by one address. [Pool event ledger](analysis/pool-swaps.csv), [loan ledger](analysis/main-borrows.csv), [raw source archive](sources.zip).
 
 The main borrowing address, `0x5dae2c3d5a9f35bfaf36a2e6edd07c477f57789e`, made nine MOO purchases. The MOO quote returned to the lending pool rose from **0.02377296 to 4.81463250**, a **202.53-fold increase** between its first and last sampled loans. After the address's final purchase, seven more loans credited **2,929,117.669 CELO, 644,523.14 cUSD, 765,106.12 cEUR and 251,786.27 MOO**. The CELO portion was **27.70%** of this address's gross CELO borrowing in the episode. These are token credits, not profit or a dollar loss estimate. [Loan ledger](analysis/main-borrows.csv), [calculated results](analysis/summary.json).
 
@@ -29,7 +29,7 @@ Historical transaction metadata, raw event bytes and execution traces come from 
 
 The traced call chain matters more than a coincident price chart. During each sampled loan, the lending pool at `0x970b12522ca9b4054807a2c5b736149a5be6f670` requests MOO's price from **MoolaOracle** at `0xba2224905ad3cdba6c1b764cd62fda52bd524d29`. Its verified source uses CELO as the account-value unit. The request reaches a price provider and a `PriceFeed`, which asks for the output quote for **one MOO into mCELO**. The value returned by this feed is passed back to the lending pool. The saved traces show the downstream reader querying the same pool's cumulative prices and reserves. [MoolaOracle source](https://explorer.celo.org/mainnet/address/0xba2224905ad3cdba6c1b764cd62fda52bd524d29?tab=contract), [PriceFeed source](https://explorer.celo.org/mainnet/address/0xe8e30f32141321180cc1827de43d841f4e88b968?tab=contract).
 
-For every loan, the reconstruction matches the transaction origin and calldata to its trace, extracts the actual MOO oracle return, and reconciles the borrowed amount with both the `Borrow` event and the underlying token transfer to the main address. The final MOO loan requests the MOO price twice; both returns agree. The underlying sliding-window contract was not source-verified in the captured explorer response, so this study does **not** claim a verified averaging horizon or simulate its internal observation buffer.
+For every loan, the reconstruction matches the transaction origin and calldata to its trace, extracts the actual MOO oracle return, and reconciles the borrowed amount with both the `Borrow` event and the underlying token transfer to the main address. The final MOO loan requests the MOO price twice; both returns agree. The underlying sliding-window contract was not source-verified in the captured explorer response, so this study does **not** claim a verified averaging horizon or simulate its internal observation buffer. [Reconciled loans and oracle call counts](analysis/main-borrows.csv), [saved execution traces and contract responses](sources.zip).
 
 {{< figure src="pool-and-oracle.png" alt="Indexed pool reserve price and actual oracle returns during 28 loans, above cumulative CELO borrowing" caption="Pool reserve ratios and observed loan oracle returns use separate initial values of 100, on a logarithmic scale. Triangles mark the nine purchases by the main address. The dashed line marks its last purchase. The lower panel shows gross CELO credits, excluding loans in other tokens." >}}
 
@@ -47,7 +47,7 @@ This distinction changes the interpretation. Opposing transactions were observab
 
 ## Credit continued after the last purchase
 
-The last main-address purchase occurred at **16:20:49 UTC**. Four subsequent CELO loans were followed by one cUSD, one cEUR and one MOO loan, ending **4 minutes 35 seconds later**. No further purchase or collateral deposit by this address appears in its covered transactions during that interval.
+The last main-address purchase occurred at **16:20:49 UTC**. Four subsequent CELO loans were followed by one cUSD, one cEUR and one MOO loan, ending **4 minutes 35 seconds later**. No further purchase or collateral deposit by this address appears in its covered transactions during that interval. [Full focused transaction sequence](analysis/main-account-transactions.csv), [timestamped loan ledger](analysis/main-borrows.csv), [raw transaction records](sources.zip).
 
 | Borrowed asset | Gross credit in all 28 loans | Gross credit after the last purchase |
 | -------------- | ---------------------------: | -----------------------------------: |
