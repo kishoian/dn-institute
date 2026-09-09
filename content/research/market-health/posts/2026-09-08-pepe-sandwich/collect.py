@@ -31,7 +31,9 @@ def fetch(name, method, params, endpoint=OTHER_RPC):
         cached = envelope.get("result") if isinstance(envelope, dict) else None
         if (isinstance(envelope, dict) and "error" not in envelope
                 and envelope.get("method") == method and envelope.get("params") == params
-                and envelope.get("endpoint") == endpoint and valid(method, cached)):
+                and envelope.get("endpoint") == endpoint
+                and valid_retrieval_time(envelope.get("retrieved_at_utc"))
+                and valid(method, cached)):
             return cached
     payload = json.dumps({"jsonrpc": "2.0", "id": 1,
                           "method": method, "params": params}).encode()
@@ -55,6 +57,17 @@ def fetch(name, method, params, endpoint=OTHER_RPC):
             if attempt == 4:
                 raise
             time.sleep(2 ** attempt)
+
+
+def valid_retrieval_time(value):
+    """Require the UTC provenance timestamp used by manifest and packing."""
+    if not isinstance(value, str):
+        return False
+    try:
+        recorded = dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    return recorded.utcoffset() == dt.timedelta(0)
 
 
 def valid(method, value):

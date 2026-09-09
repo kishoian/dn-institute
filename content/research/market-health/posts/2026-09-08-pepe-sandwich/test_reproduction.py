@@ -179,6 +179,34 @@ class EvidenceRegressionTests(unittest.TestCase):
             "sha256": hashlib.sha256(blob).hexdigest(), "records": 1}))
         return staging
 
+    def test_incomplete_cache_metadata_is_refetched_before_manifest(self):
+        original = {**envelope(["stale"]), "endpoint": collect.OTHER_RPC}
+        variants = []
+        for key in ("endpoint", "method", "params", "retrieved_at_utc"):
+            incomplete = dict(original)
+            del incomplete[key]
+            variants.append(("missing " + key, incomplete))
+        for value in (None, "", 123, "not-a-date", "2026-09-09T00:00:00",
+                      "2026-09-09T03:00:00+03:00"):
+            variants.append((repr(value), {**original, "retrieved_at_utc": value}))
+        for label, cached in variants:
+            with self.subTest(metadata=label):
+                path = self.raw / "sample.json.gz"
+                path.write_bytes(gzip.compress(json.dumps(cached).encode()))
+                response = contextlib.nullcontext(io.BytesIO(b'{"result": ["fresh"]}'))
+                with (patch.object(collect, "ROOT", self.root),
+                      patch.object(collect, "RAW", self.raw),
+                      patch.object(collect.urllib.request, "urlopen", return_value=response) as fetch):
+                    self.assertEqual(collect.fetch("sample", "eth_getLogs", []), ["fresh"])
+                    fetch.assert_called_once()
+                    collect.manifest()
+                    repaired = json.loads(gzip.decompress(path.read_bytes()))
+                    self.assertTrue(collect.valid_retrieval_time(repaired["retrieved_at_utc"]))
+                with (patch.object(collect, "RAW", self.raw),
+                      patch.object(collect.urllib.request, "urlopen", side_effect=RuntimeError("Network forbidden"))):
+                    self.assertEqual(collect.fetch("sample", "eth_getLogs", []), ["fresh"])
+        self.assert_preserved()
+
     def test_interruption_before_manifest_switch_preserves_old_snapshot(self):
         staging = self.staged_snapshot()
         original_replace = Path.replace
