@@ -1,0 +1,37 @@
+{
+  "receipt_based_replay_outputs_checked": 115,
+  "receipt_based_margin_and_gas_checks": 58,
+  "outer_origin_episode_counts": {
+    "0x758e8229dd38cf11fa9e7c0d5f790b4ca16b3b16": 36,
+    "0x000026b0b3f1cc243a56736a93aa28e4d97a7d2a": 5,
+    "0x927300011e3e02c4858a1b000027cc007f000000": 5,
+    "0x000013de30d1b1d830dcb7d54660f4778d2d4af5": 5,
+    "0x000039bba92085a7c622466903aa40fd6fc6c7e3": 4,
+    "0x83b4f74296738d8c2e15bd7c1f4a19df122354f5": 2,
+    "0x1114c78d5de672996d812dc2e1a05b5f33eacdfb": 1
+  },
+  "leading_origin": "0x758e8229dd38cf11fa9e7c0d5f790b4ca16b3b16",
+  "leading_origin_episodes": 36,
+  "excluding_leading_origin": {
+    "episodes": 22,
+    "purchases": 45,
+    "median_shortfall_bps": "142.7852395385787594422480914557716311895620124412324300819486859688892"
+  },
+  "purchase_recognized_swap_count_distribution": {
+    "1": 81,
+    "2": 29,
+    "3": 2,
+    "4": 2,
+    "5": 1
+  },
+  "one_recognized_swap_purchase_subset": {
+    "purchases": 81,
+    "median_shortfall_bps": "203.0724680315985827833775137529647626525576963750503361886994587007612"
+  },
+  "limitations": [
+    "The sample is supplied by episodes.csv and victims.csv; this does not independently select cases.",
+    "The same saved RPC evidence is reused; no independent peer review is claimed.",
+    "One recognized V2/V3 swap does not prove a simple route or a wallet-level loss.",
+    "Removing the leading origin is a descriptive sensitivity check, not a new control market."
+  ]
+}

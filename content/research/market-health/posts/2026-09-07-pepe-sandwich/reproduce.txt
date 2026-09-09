@@ -1,0 +1,147 @@
+PEPE/WETH sandwich replay: reproduction and research protocol
+===========================================================
+
+Primary artifact: index.md and its three SVG figures, prepared for DNI issue #277.
+Collection date: 8 September 2026 (UTC). Market-data period: 18-19 April 2023.
+
+Offline reproduction (run from this directory)
+----------------------------------------------
+Python 3.10 or later, standard library only for collection, analysis and validation:
+
+    python3 analyze.py
+    python3 analyze.py --inventory-bps 1
+    python3 validate.py
+    python3 review_sample.py
+
+The committed data/evidence.jsonl.gz is sufficient. No wallet, API key, paid
+service, or network access is needed. Analyze reads the packed snapshot first;
+data/raw is a local collector cache and is ignored by Git.
+
+Optional figures (Matplotlib and NumPy):
+
+    MPLCONFIGDIR=/tmp/dni-matplotlib python3 plot.py
+
+Tested with Python 3.12.6. Exact library versions used for the figures are recorded
+in data/plot-environment.json. The notebook audit.ipynb is a compact companion;
+the scripts remain the canonical implementation.
+
+Evidence layout
+---------------
+data/evidence.jsonl.gz: one JSON object per line with fields name and response.
+The response envelope retains endpoint, RPC method, params, retrieval timestamp
+and the unmodified JSON result object. This is a logical JSON snapshot, not a
+capture of HTTP headers or original byte formatting. Expected 10,349 records:
+11 log requests, 3 identity calls, 1,226 blocks, 4,553 transactions, 4,556 receipts.
+The extra three receipts are the independent-provider check.
+
+data/manifest.json: compressed archive SHA-256, size, counts, retrieval interval.
+data/swaps.csv.gz: decoded 25,768-swap ledger, including raw integer token units,
+pre/post reserves, hashes, indices, direction, pool caller and recipient.
+data/screening.csv: every structural candidate and its first failing check.
+data/episodes.csv: 58 primary sequences; exact inventory, margin and gas amounts.
+data/victims.csv: 115 intervening purchases with raw and decimal replay outputs.
+data/coverage.csv: consecutive block ranges and event counts (including non-swaps).
+data/summary.json: computed headlines, primary inclusion rule and window bounds.
+data/sensitivity-1bp/: a separately labeled relaxed-inventory analysis.
+data/validation.json: integrity, arithmetic and source consistency results.
+data/sample-review.json: receipt-based replay cross-check, outer-origin
+concentration, leave-leading-origin-out median, and routed-purchase diagnostics.
+data/pilot-evidence.jsonl.gz: the complete negative-pilot RPC evidence, with a
+separate checksum in data/pilot-manifest.json; checked by validate.py.
+
+All PEPE and WETH amounts use 18 decimals. Quantities are kept as integers in
+the AMM replay; floating-point numbers are used only in plotting. One basis point
+is 0.01 percentage point. The purchase shortfall denominator is its replay output.
+Margin is measured at the pool boundary; gas is transaction-wide. There is no USD
+conversion, account ownership inference, mempool reconstruction, or private
+payment estimate. Public on-chain addresses are evidence, not personal identity.
+
+Source retrieval (optional, not required to review the results)
+-------------------------------------------------------------
+collect.py sends only eth_getLogs, eth_getBlockByNumber, eth_call,
+eth_getTransactionByHash and eth_getTransactionReceipt. It cannot sign or submit
+transactions. It uses three concurrent read requests and bounded retries.
+
+    python3 collect.py logs
+    python3 collect.py transactions
+    python3 collect.py verify
+    python3 pack_evidence.py
+    python3 analyze.py
+    python3 analyze.py --inventory-bps 1
+    python3 validate.py
+
+The collector caches successful, shape-validated results. To refresh evidence,
+use a fresh copy without data/raw. Packing replaces the archive/manifest with the
+new snapshot. Re-running verify before packing relies on the committed summary
+to identify the same first case. For a new dataset, first run analyze.py on raw
+evidence before verify and packing. Public endpoints may later impose limits;
+the offline snapshot is the review source if refetching is unavailable.
+
+Historical reserves are initialized from the last Sync in the preceding 1,000
+blocks, then carried through all Sync events. No archive-state eth_call is needed.
+Token0, token1 and factory identity reads use latest state: the canonical V2 pair
+sets these fields once at initialization. Swap and Sync arithmetic independently
+reconciles the historical token order. A one-base-unit observed-output tolerance
+is allowed, but PEPE inventory closure in the primary sample is exact.
+
+Selection history and limits (not preregistered)
+----------------------------------------------
+1. Reviewed the issue and all five existing market-health articles, including the
+   accepted Bybit empirical study. The task requires original market data.
+2. Checked all 18 open PRs and repository-wide issue/PR search for "sandwich".
+   The related USDC/USDT V3 submission #1124 was closed; it is a different pool,
+   event and methodology. No open PEPE sandwich submission was found at review.
+3. Initially tried round-number blocks 22,000,000-22,009,999 in the PEPE/WETH pool.
+   The complete pilot contained 1,476 events and 734 swaps (327 buys, 407 sells).
+   There were zero structural candidates. This is not a claim of no MEV.
+4. Selected the earlier round-number window 17,070,000-17,079,999 to study the
+   mechanism during early PEPE trading. This was an adaptive, exploratory choice,
+   not random sampling. The first window is not used as a causal control or to
+   estimate a decline in attack rates.
+5. Explored inventory closure within 1 bp: 65 sequences, 122 purchases. Tightened
+   the primary rule to exact integer closure to remove residual-inventory
+   ambiguity: 58 sequences, 115 purchases. Both complete outputs are supplied.
+6. The first accepted chronological sequence was chosen for the worked example,
+   not the largest measured shortfall. There are no cross-sequence p-values or
+   confidence intervals: this is a deterministic conditional replay in a selected
+   historical window, with dependent purchases inside each sequence.
+
+Independent checks
+------------------
+validate.py reconstructs the output using Fraction-based constant-product
+arithmetic, independently of analyze.py's integer numerator/denominator formula.
+It checks all 115 replay outputs, all 58 no-intervening-flow controls, all 231
+selected receipts against the pool log feed, archive integrity, no duplicated
+purchase hashes, exact inventory closure, and headline aggregation. Three
+receipts from the first case additionally agree between PublicNode and BlockPI.
+These checks do not independently verify Ethereum trie proofs or establish the
+ultimate infrastructure independence of the RPC providers.
+
+review_sample.py imports no analysis functions: it decodes selected Swap/Sync
+receipt events, recomputes all 115 replay outputs and all 58 margins/gas costs,
+then measures sample concentration and extra recognized swaps in purchase
+receipts. It verifies the selected sample rather than independently selecting
+cases or evaluating false-positive/false-negative rates. Both checking scripts
+reuse the saved evidence and are author-side validation, not external peer review.
+The leading origin supplies 36 of 58 sequences; excluding it leaves 45 purchases
+with a 1.43% median shortfall. Of 115 purchase receipts, 34 have extra recognized
+V2/V3 swaps; the 81 with one recognized swap have a 2.03% median. These are
+descriptive sensitivities, not matched control markets or wallet-loss estimates.
+
+Chart map
+---------
+execution-shortfall.svg: empirical CDF; one row per included buy; observed
+shortfall percentage and cumulative fraction; blue plus neutral median guide.
+margin-and-gas.svg: zero-based component bars; sums across 58 sequences; WETH/ETH
+unit comparison; blue, gold, neutral; remainder is not net profit.
+first-sequence.svg: observed four-stage reserve-price index and zero-based output
+comparison; the four stages are a transaction mechanism, not a temporal trend.
+The left scale is explicitly focused. Blue and neutral/open marks distinguish
+observed and counterfactual results. PNG copies are supplied for convenient QA.
+
+Publication scope
+-----------------
+The submission concerns a historical price-manipulation mechanism. It contains
+no attack execution code or wallet functionality. Generated code fetches public
+data and performs offline measurement. No claim is made that a named exchange,
+project team, token issuer, or identifiable individual arranged these trades.

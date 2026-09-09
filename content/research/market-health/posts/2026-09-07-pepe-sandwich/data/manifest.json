@@ -1,0 +1,20 @@
+{
+  "format": "gzip-compressed JSON Lines; one named RPC request/result envelope per line",
+  "file": "evidence.jsonl.gz",
+  "sha256": "9e080aedcb45e57fabea4b5e9ef94f0f866e7d6b99f81593fcaa7074d95b2a14",
+  "bytes": 17192085,
+  "records": 10349,
+  "methods": {
+    "eth_getBlockByNumber": 1226,
+    "eth_call": 3,
+    "eth_getLogs": 11,
+    "eth_getTransactionReceipt": 4556,
+    "eth_getTransactionByHash": 4553
+  },
+  "endpoints": {
+    "https://ethereum-rpc.publicnode.com": 10332,
+    "https://ethereum.public.blockpi.network/v1/rpc/public": 17
+  },
+  "first_retrieved_at_utc": "2026-09-08T11:04:13.831921+00:00",
+  "last_retrieved_at_utc": "2026-09-08T12:58:32.764424+00:00"
+}

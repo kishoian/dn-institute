@@ -1,0 +1,26 @@
+{
+  "snapshot_sha256": "pass",
+  "snapshot_records": 10349,
+  "complete_event_range": [
+    17070000,
+    17079999
+  ],
+  "duplicate_events": 0,
+  "reserve_transitions_checked": 25768,
+  "selected_receipts_checked": 231,
+  "independent_fraction_counterfactuals": 115,
+  "no_intervening_flow_controls": 58,
+  "second_provider_receipts_checked": 3,
+  "headline_reconciliation": "pass",
+  "inventory_closure_base_units": "exact",
+  "limitations": [
+    "RPC responses are not independently verified against Ethereum receipt trie roots.",
+    "No mempool history, common-owner attribution, or private builder payments are available.",
+    "The counterfactual holds inputs and routing fixed; it is not a full market simulation."
+  ],
+  "negative_pilot": {
+    "events": 1476,
+    "swaps": 734,
+    "structural_candidates": 0
+  }
+}

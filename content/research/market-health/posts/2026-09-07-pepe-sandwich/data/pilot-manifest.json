@@ -1,0 +1,6 @@
+{
+  "file": "pilot-evidence.jsonl.gz",
+  "sha256": "5381e497c04b8b881e690df2a5280ebc011bdd23138b3cc3951788d41e09fd1b",
+  "records": 17,
+  "description": "Exploratory negative pilot, blocks 22000000-22009999; not a matched causal control."
+}
