@@ -1,4 +1,5 @@
 __pycache__/
 data/raw/
+data/collection-manifest.json
 data/swaps.csv
 data/sensitivity-1bp/swaps.csv

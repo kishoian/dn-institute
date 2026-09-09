@@ -1,23 +1,35 @@
 #!/usr/bin/env python3
 """Independent arithmetic, source integrity and selection checks; offline."""
+import argparse
 import collections
 import csv
-from decimal import Decimal
+from decimal import Decimal, getcontext
 from fractions import Fraction
-import gzip
-import hashlib
 import json
 from pathlib import Path
 import statistics
 import analyze as a
+from evidence import load_archive
+
+# Make the validation precision explicit rather than relying on import effects.
+getcontext().prec = 70
 
 
 def main():
-    root, data = a.ROOT, a.DATA
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--source-only", action="store_true",
+                        help="Validate archives and replay dependencies without reading derived CSVs")
+    args = parser.parse_args()
+    data = a.DATA
+    swaps, profile = a.preflight()
     manifest = json.loads((data / "manifest.json").read_text())
-    assert hashlib.sha256((data / manifest["file"]).read_bytes()).hexdigest() == manifest["sha256"]
-    assert len(a.archive()) == manifest["records"]
-    swaps, profile = a.decode()
+    pilot_records = load_archive(data, "pilot-manifest.json")
+    for start in range(22_000_000, 22_010_000, 1000):
+        if f"logs-{start}-{start+999}" not in pilot_records:
+            raise ValueError(f"Missing pilot log range starting at {start}")
+    if args.source_only:
+        print("Archive integrity, RPC result shapes and replay dependencies: PASS")
+        return
     by_hash = collections.defaultdict(list)
     for s in swaps:
         by_hash[s["tx"]].append(s)
@@ -81,10 +93,7 @@ def main():
         "limitations": ["RPC responses are not independently verified against Ethereum receipt trie roots.",
                         "No mempool history, common-owner attribution, or private builder payments are available.",
                         "The counterfactual holds inputs and routing fixed; it is not a full market simulation."]}
-    pilot_manifest = json.loads((data / "pilot-manifest.json").read_text())
-    assert hashlib.sha256((data / pilot_manifest["file"]).read_bytes()).hexdigest() == pilot_manifest["sha256"]
-    with gzip.open(data / pilot_manifest["file"], "rt") as stream:
-        pilot = {r["name"]: r["response"]["result"] for r in map(json.loads, stream)}
+    pilot = {name: row["result"] for name, row in pilot_records.items()}
     pilot_logs = [l for start in range(22_000_000, 22_010_000, 1000)
                   for l in pilot[f"logs-{start}-{start+999}"]]
     pilot_swaps = []
@@ -92,7 +101,8 @@ def main():
         if l["topics"][0] != a.SWAP:
             continue
         a0i, a1i, a0o, a1o = a.words(l["data"])
-        direction = "buy" if a1i and a0o and not a0i and not a1o else "sell"
+        direction = "buy" if a1i > 0 and a0o > 0 and a0i == a1o == 0 else (
+                    "sell" if a0i > 0 and a1o > 0 and a1i == a0o == 0 else "complex")
         pilot_swaps.append({"block": int(l["blockNumber"], 16), "direction": direction,
                             "tx": l["transactionHash"], "sender": "0x"+l["topics"][1][-40:]})
     assert len(pilot_logs) == 1476 and len(pilot_swaps) == 734

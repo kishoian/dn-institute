@@ -22,8 +22,10 @@ def fetch(name, method, params, endpoint=OTHER_RPC):
     RAW.mkdir(parents=True, exist_ok=True)
     path = RAW / (name + ".json.gz")
     if path.exists():
-        cached = json.loads(gzip.decompress(path.read_bytes()))["result"]
-        if valid(method, cached):
+        envelope = json.loads(gzip.decompress(path.read_bytes()))
+        cached = envelope.get("result")
+        if (envelope.get("method") == method and envelope.get("params") == params
+                and envelope.get("endpoint") == endpoint and valid(method, cached)):
             return cached
     payload = json.dumps({"jsonrpc": "2.0", "id": 1,
                           "method": method, "params": params}).encode()
@@ -64,7 +66,7 @@ def manifest():
                         "endpoint": envelope["endpoint"], "method": envelope["method"],
                         "params": envelope["params"],
                         "retrieved_at_utc": envelope["retrieved_at_utc"]})
-    (ROOT / "data" / "manifest.json").write_text(json.dumps(records, indent=2) + "\n")
+    (ROOT / "data" / "collection-manifest.json").write_text(json.dumps(records, indent=2) + "\n")
 
 
 def main():
@@ -89,6 +91,7 @@ def main():
             fetch(f"identity-{name}", "eth_call", [{"to": POOL, "data": selector}, "latest"], LOG_RPC)
     elif args.stage == "transactions":
         import analyze
+        analyze.SOURCE = "raw"
         swaps, profile = analyze.decode()
         candidates = analyze.structural_candidates(swaps)
         hashes = sorted({s["tx"] for c in candidates for s in c})

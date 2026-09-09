@@ -6,18 +6,19 @@ import csv
 import datetime as dt
 from decimal import Decimal, getcontext
 import gzip
-import hashlib
 import json
 import io
 from pathlib import Path
 import statistics
 from functools import lru_cache
+from evidence import checked_result, load_archive, named_result
 
 getcontext().prec = 70
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "data"
 OUTPUT = DATA
 RAW = DATA / "raw"
+SOURCE = "archive"
 START, END = 17_070_000, 17_079_999
 POOL = "0xa43fe16908251ee70ef74718545e4fe6c5ccec9f"
 SWAP = "0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822"
@@ -28,18 +29,16 @@ WEI = 10**18
 
 @lru_cache(maxsize=1)
 def archive():
-    path = DATA / "evidence.jsonl.gz"
-    if not path.exists():
-        return None
-    with gzip.open(path, "rt") as stream:
-        return {row["name"]: row["response"] for row in map(json.loads, stream)}
+    return load_archive(DATA)
 
 
 def raw(name):
-    packed = archive()
-    if packed is not None:
-        return packed[name]["result"]
-    return json.loads(gzip.decompress((RAW / (name + ".json.gz")).read_bytes()))["result"]
+    if SOURCE == "archive":
+        return named_result(archive(), name)
+    path = RAW / (name + ".json.gz")
+    if not path.exists():
+        raise ValueError(f"Missing required raw evidence: {path}")
+    return checked_result(name, json.loads(gzip.decompress(path.read_bytes())))
 
 
 def words(data):
@@ -73,12 +72,13 @@ def dump_csv(name, rows):
         writer.writerows(rows)
 
 
-def decode():
+def decode(read=None):
+    read = read or raw
     logs = []
     chunks = []
     for start in range(START, END+1, 1000):
         name = f"logs-{start}-{min(start+999, END)}"
-        rows = raw(name)
+        rows = read(name)
         assert isinstance(rows, list), name
         assert all(start <= int(l["blockNumber"], 16) <= min(start+999, END) for l in rows)
         chunks.append({"first_block": start, "last_block": min(start+999, END), "event_count": len(rows)})
@@ -87,7 +87,7 @@ def decode():
     keys = {(l["blockHash"], l["logIndex"]) for l in logs}
     assert len(keys) == len(logs), "Duplicate event keys"
     assert all(not l["removed"] and l["address"] == POOL for l in logs)
-    prior = [l for l in raw("initial-sync-logs") if l["topics"][0] == SYNC]
+    prior = [l for l in read("initial-sync-logs") if l["topics"][0] == SYNC]
     prior.sort(key=lambda l: (int(l["blockNumber"], 16), int(l["logIndex"], 16)))
     reserve = words(prior[-1]["data"])
     swaps = []
@@ -145,18 +145,39 @@ def structural_candidates(swaps):
     return result
 
 
+def preflight(read=None):
+    """Check all replay dependencies before writing any derived output.
+
+    Independent-provider receipts are collected after the raw replay and are
+    checked by validate.py; they are not dependencies of the replay itself.
+    """
+    read = read or raw
+    for name in ("identity-token0", "identity-token1", "identity-factory",
+                 f"block-{START}", f"block-{END}"):
+        read(name)
+    swaps, profile = decode(read)
+    for seq in structural_candidates(swaps):
+        read(f"block-{seq[0]['block']}")
+        for swap in seq:
+            read("tx-" + swap["tx"])
+            read("receipt-" + swap["tx"])
+    return swaps, profile
+
+
 def main():
-    global OUTPUT
+    global OUTPUT, SOURCE
     parser = argparse.ArgumentParser()
     parser.add_argument("--inventory-bps", type=int, choices=[0, 1], default=0)
+    parser.add_argument("--source", choices=["archive", "raw"], default="archive")
     args = parser.parse_args()
+    SOURCE = args.source
     if args.inventory_bps:
         OUTPUT = DATA / "sensitivity-1bp"
         OUTPUT.mkdir(exist_ok=True)
     assert raw("identity-token0")[-40:] == "6982508145454ce325ddbe47a25d4ec3d2311933"
     assert raw("identity-token1")[-40:] == "c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
     assert raw("identity-factory")[-40:] == "5c69bee701ef814a2b6a3edd4b1652cb9cc5aa6f"
-    swaps, profile = decode()
+    swaps, profile = preflight()
     candidates = structural_candidates(swaps)
     episodes, victims, screening = [], [], []
     used = set()

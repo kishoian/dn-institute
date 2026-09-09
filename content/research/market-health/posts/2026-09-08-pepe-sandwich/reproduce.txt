@@ -8,14 +8,22 @@ Offline reproduction (run from this directory)
 ----------------------------------------------
 Python 3.10 or later, standard library only for collection, analysis and validation:
 
-    python3 analyze.py
+    python3 validate.py --source-only
+    python3 analyze.py --source archive
     python3 analyze.py --inventory-bps 1
     python3 validate.py
     python3 review_sample.py
 
 The committed data/evidence.jsonl.gz is sufficient. No wallet, API key, paid
-service, or network access is needed. Analyze reads the packed snapshot first;
-data/raw is a local collector cache and is ignored by Git.
+service, or network access is needed. Archive mode is the default and validates
+the manifest SHA-256, record count, named records and RPC result shapes before
+replay. It never falls back to data/raw. Select --source raw explicitly to read
+the local collector cache, which is ignored by Git. Both modes check replay
+dependencies before writing derived data.
+
+Regression checks for corrupt/missing inputs and the refresh workflow:
+
+    python3 -m unittest -v test_reproduction.py
 
 Optional figures (Matplotlib and NumPy):
 
@@ -35,6 +43,8 @@ capture of HTTP headers or original byte formatting. Expected 10,349 records:
 The extra three receipts are the independent-provider check.
 
 data/manifest.json: compressed archive SHA-256, size, counts, retrieval interval.
+data/collection-manifest.json: local cache inventory, written only by collect.py;
+it is separate from the committed archive manifest and is ignored by Git.
 data/swaps.csv.gz: decoded 25,768-swap ledger, including raw integer token units,
 pre/post reserves, hashes, indices, direction, pool caller and recipient.
 data/screening.csv: every structural candidate and its first failing check.
@@ -64,17 +74,24 @@ transactions. It uses three concurrent read requests and bounded retries.
 
     python3 collect.py logs
     python3 collect.py transactions
+    python3 analyze.py --source raw
     python3 collect.py verify
     python3 pack_evidence.py
-    python3 analyze.py
+    python3 validate.py --source-only
+    python3 analyze.py --source archive
     python3 analyze.py --inventory-bps 1
     python3 validate.py
 
 The collector caches successful, shape-validated results. To refresh evidence,
-use a fresh copy without data/raw. Packing replaces the archive/manifest with the
-new snapshot. Re-running verify before packing relies on the committed summary
-to identify the same first case. For a new dataset, first run analyze.py on raw
-evidence before verify and packing. Public endpoints may later impose limits;
+use a fresh copy without data/raw. Transaction collection explicitly decodes raw
+logs; the raw analysis then generates the summary used by verify. It does not use
+the committed summary to choose the first case of newly collected data. Keep the
+pool/range constants in collect.py and analyze.py synchronized when adapting the
+study. Packing rejects an empty, malformed or incomplete cache before replacing
+anything, writes to temporary files, and checks the complete replay dependencies.
+Each archive/manifest file is replaced atomically; they are not one transactional
+filesystem object. An interruption between the two replacements is detectable by
+the checksum check. Public endpoints may later impose limits;
 the offline snapshot is the review source if refetching is unavailable.
 
 Historical reserves are initialized from the last Sync in the preceding 1,000
