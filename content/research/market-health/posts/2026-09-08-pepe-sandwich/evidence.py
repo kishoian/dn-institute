@@ -11,6 +11,22 @@ def require(condition, message):
         raise ValueError(message)
 
 
+RECEIPT_FIELDS = ("transactionHash", "blockHash", "blockNumber", "transactionIndex",
+                  "gasUsed", "effectiveGasPrice", "status", "logs")
+
+
+def compare_receipts(first, second, label):
+    for key in RECEIPT_FIELDS:
+        require(key in first and key in second and first[key] == second[key],
+                f"Second-provider receipt mismatch: {label}: {key}")
+
+
+def verify_second_provider(read, case):
+    for role in ("front", "victim", "back"):
+        tx = case[role]
+        compare_receipts(read("receipt-" + tx), read("verify-receipt-" + tx), role)
+
+
 def publish_snapshot(staging, data):
     """Publish immutable evidence, then atomically switch the manifest pointer.
 
@@ -58,12 +74,13 @@ def checked_result(name, envelope):
     elif method == "eth_call":
         valid = isinstance(result, str) and result.startswith("0x") and len(result) > 2
     elif method == "eth_getBlockByNumber":
-        valid = isinstance(result, dict) and all(k in result for k in ("hash", "timestamp"))
+        valid = isinstance(result, dict) and all(result.get(k) is not None for k in ("hash", "timestamp", "number"))
     elif method == "eth_getTransactionByHash":
-        valid = isinstance(result, dict) and "hash" in result
+        valid = (isinstance(result, dict) and all(result.get(k) is not None
+                 for k in ("hash", "blockHash", "blockNumber", "transactionIndex", "from")) and "to" in result)
     elif method == "eth_getTransactionReceipt":
-        valid = (isinstance(result, dict) and "transactionHash" in result
-                 and isinstance(result.get("logs"), list) and "status" in result)
+        valid = (isinstance(result, dict) and all(result.get(k) is not None for k in RECEIPT_FIELDS)
+                 and isinstance(result.get("logs"), list))
     if not valid:
         raise ValueError(f"Missing or unusable {method!r} result for {name}")
     return result

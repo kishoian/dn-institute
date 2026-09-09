@@ -7,7 +7,7 @@ import gzip
 import hashlib
 import json
 from pathlib import Path
-from evidence import require
+from evidence import checked_result, compare_receipts
 import time
 import urllib.request
 import zlib
@@ -58,11 +58,11 @@ def fetch(name, method, params, endpoint=OTHER_RPC):
 
 
 def valid(method, value):
-    if method == "eth_getLogs":
-        return isinstance(value, list)
-    if method == "eth_call":
-        return isinstance(value, str) and value.startswith("0x")
-    return isinstance(value, dict) and ("hash" in value or "transactionHash" in value)
+    try:
+        checked_result("collector response", {"method": method, "result": value})
+    except ValueError:
+        return False
+    return True
 
 
 def manifest():
@@ -123,9 +123,8 @@ def main():
         for role in ["front", "victim", "back"]:
             tx = case[role]
             result = fetch(f"verify-receipt-{tx}", "eth_getTransactionReceipt", [tx], LOG_RPC)
-            original = json.loads(gzip.decompress((RAW / f"receipt-{tx}.json.gz").read_bytes()))["result"]
-            for key in ["blockHash", "transactionHash", "transactionIndex", "status", "gasUsed", "logs"]:
-                require(result[key] == original[key], (role, key))
+            original = fetch(f"receipt-{tx}", "eth_getTransactionReceipt", [tx], OTHER_RPC)
+            compare_receipts(original, result, role)
         print("Independent-provider receipt check passed")
     manifest()
 

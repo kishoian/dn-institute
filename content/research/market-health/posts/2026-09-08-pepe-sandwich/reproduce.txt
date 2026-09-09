@@ -91,6 +91,9 @@ study. Packing rejects an empty, malformed or incomplete cache before replacing
 anything, writes to temporary files, and executes the full replay against the
 staged archive before replacement. Token/factory identity checks are shared by
 the preflight and replay paths. Staging cannot modify the published CSV outputs.
+Publication also requires the three second-provider receipts selected by the
+staged replay, comparing gasUsed and effectiveGasPrice as well as event and block
+fields. Collector cache reuse uses the same method-specific envelope validator.
 Changed snapshots receive immutable, SHA-256-named archive files; only the
 manifest pointer is replaced atomically. An interruption before that switch
 leaves the previous manifest and archive usable. Previous archives are retained;

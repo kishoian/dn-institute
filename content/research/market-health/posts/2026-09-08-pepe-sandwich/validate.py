@@ -10,7 +10,7 @@ from pathlib import Path
 from evidence import require
 import statistics
 import analyze as a
-from evidence import load_archive
+from evidence import load_archive, verify_second_provider
 
 # Make the validation precision explicit rather than relying on import effects.
 getcontext().prec = 70
@@ -73,11 +73,7 @@ def main():
             logs = [l for l in receipt["logs"] if l["address"] == a.POOL and int(l["logIndex"], 16) == s["log_index"]]
             require(len(logs) == 1, 'Validation failed: len(logs) == 1')
             require(a.words(logs[0]["data"]) == (s["a0in"], s["a1in"], s["a0out"], s["a1out"]), 'Validation failed: a.words(logs[0]["data"]) == (s["a0in"], s["a1in"], s["a0out"], s["a1out"])')
-    for role in ["front", "victim", "back"]:
-        tx = summary["spot_check"][role]
-        first, second = a.raw("receipt-"+tx), a.raw("verify-receipt-"+tx)
-        for key in ["transactionHash", "blockHash", "transactionIndex", "gasUsed", "status", "logs"]:
-            require(first[key] == second[key], 'Validation failed: first[key] == second[key]')
+    verify_second_provider(a.raw, summary["spot_check"])
     require(len(victims) == len({v["tx_hash"] for v in victims}), 'Validation failed: len(victims) == len({v["tx_hash"] for v in victims})')
     require(len(episodes) == summary["accepted_episodes"], 'Validation failed: len(episodes) == summary["accepted_episodes"]')
     require(sum(int(e["victim_count"]) for e in episodes) == len(victims) == summary["affected_buy_swaps"], 'Validation failed: sum(int(e["victim_count"]) for e in episodes) == len(victims) == summary["affected_buy_swaps"]')

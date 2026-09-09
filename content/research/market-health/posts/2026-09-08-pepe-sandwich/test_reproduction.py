@@ -93,6 +93,29 @@ class EvidenceRegressionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Missing required evidence record: missing"):
             evidence.named_result(evidence.load_archive(self.data), "missing")
 
+    def test_collector_rejects_method_specific_incomplete_results(self):
+        for method, result in [("eth_getBlockByNumber", {"hash": "0x1"}),
+                               ("eth_getTransactionByHash", {"hash": "0x1"}),
+                               ("eth_getTransactionReceipt", {"transactionHash": "0x1"}),
+                               ("eth_call", "0x")]:
+            with self.subTest(method=method):
+                self.assertFalse(collect.valid(method, result))
+
+    def test_second_provider_requires_records_and_matching_gas_price(self):
+        case = {"front": "a", "victim": "b", "back": "c"}
+        receipt = {key: ([] if key == "logs" else "0x1") for key in evidence.RECEIPT_FIELDS}
+        records = {prefix + tx: {"method": "eth_getTransactionReceipt", "result": dict(receipt)}
+                   for prefix in ("receipt-", "verify-receipt-") for tx in case.values()}
+        def read(name):
+            return evidence.named_result(records, name)
+        evidence.verify_second_provider(read, case)
+        records["verify-receipt-a"]["result"]["effectiveGasPrice"] = "0x2"
+        with self.assertRaisesRegex(ValueError, "effectiveGasPrice"):
+            evidence.verify_second_provider(read, case)
+        del records["verify-receipt-a"]
+        with self.assertRaisesRegex(ValueError, "Missing required evidence record"):
+            evidence.verify_second_provider(read, case)
+
     def test_complete_snapshot_with_wrong_identity_is_rejected(self):
         original = evidence.load_archive(Path(analyze.__file__).resolve().parent / "data")
         for name in ("identity-token0", "identity-token1", "identity-factory"):

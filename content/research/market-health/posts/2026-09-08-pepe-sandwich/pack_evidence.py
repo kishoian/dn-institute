@@ -8,7 +8,7 @@ from pathlib import Path
 import tempfile
 import subprocess
 import sys
-from evidence import checked_result, publish_snapshot
+from evidence import checked_result, load_archive, named_result, publish_snapshot, verify_second_provider
 
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "data"
@@ -49,6 +49,9 @@ def main():
                                 capture_output=True, text=True)
         if replay.returncode:
             raise ValueError("Staged evidence is not replayable: " + replay.stderr[-2000:])
+        records = load_archive(staging)
+        case = json.loads((staging / "summary.json").read_text())["spot_check"]
+        verify_second_provider(lambda name: named_result(records, name), case)
         manifest = publish_snapshot(staging, DATA)
     print(json.dumps(manifest, indent=2))
 
