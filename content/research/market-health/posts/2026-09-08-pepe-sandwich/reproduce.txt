@@ -88,7 +88,9 @@ logs; the raw analysis then generates the summary used by verify. It does not us
 the committed summary to choose the first case of newly collected data. Keep the
 pool/range constants in collect.py and analyze.py synchronized when adapting the
 study. Packing rejects an empty, malformed or incomplete cache before replacing
-anything, writes to temporary files, and checks the complete replay dependencies.
+anything, writes to temporary files, and executes the full replay against the
+staged archive before replacement. Token/factory identity checks are shared by
+the preflight and replay paths. Staging cannot modify the published CSV outputs.
 Each archive/manifest file is replaced atomically; they are not one transactional
 filesystem object. An interruption between the two replacements is detectable by
 the checksum check. Public endpoints may later impose limits;

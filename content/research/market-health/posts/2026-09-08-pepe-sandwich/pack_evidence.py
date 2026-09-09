@@ -6,8 +6,9 @@ import hashlib
 import json
 from pathlib import Path
 import tempfile
-import analyze
-from evidence import checked_result, load_archive, named_result
+import subprocess
+import sys
+from evidence import checked_result
 
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "data"
@@ -41,8 +42,14 @@ def main():
             "endpoints": dict(endpoints), "first_retrieved_at_utc": min(times), "last_retrieved_at_utc": max(times)}
         staged_manifest = staging / "manifest.json"
         staged_manifest.write_text(json.dumps(manifest, indent=2)+"\n")
-        records = load_archive(staging)
-        analyze.preflight(lambda name: named_result(records, name))
+        # Validate actual replay semantics as well as the envelope/manifest
+        # contract. A shape-correct but inconsistent receipt must not replace
+        # the published archive. All derived files remain in staging.
+        replay = subprocess.run([sys.executable, str(ROOT / "analyze.py"),
+                                 "--source", "archive", "--data-dir", str(staging)],
+                                capture_output=True, text=True)
+        if replay.returncode:
+            raise ValueError("Staged evidence is not replayable: " + replay.stderr[-2000:])
         packed.replace(path)
         staged_manifest.replace(DATA / "manifest.json")
     print(json.dumps(manifest, indent=2))

@@ -89,6 +89,15 @@ class EvidenceRegressionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Missing required evidence record: missing"):
             evidence.named_result(evidence.load_archive(self.data), "missing")
 
+    def test_complete_snapshot_with_wrong_identity_is_rejected(self):
+        original = evidence.load_archive(Path(analyze.__file__).resolve().parent / "data")
+        for name in ("identity-token0", "identity-token1", "identity-factory"):
+            with self.subTest(name=name):
+                records = dict(original)
+                records[name] = {**records[name], "result": "0x" + "00"*32}
+                with self.assertRaisesRegex(ValueError, "Unexpected pool identity: " + name):
+                    analyze.preflight(lambda key: evidence.named_result(records, key))
+
     def test_raw_source_does_not_use_stale_archive(self):
         (self.raw / "sample.json.gz").write_bytes(gzip.compress(json.dumps(envelope(["new"])).encode()))
         with patch.object(analyze, "DATA", self.data), patch.object(analyze, "RAW", self.raw):

@@ -152,8 +152,13 @@ def preflight(read=None):
     checked by validate.py; they are not dependencies of the replay itself.
     """
     read = read or raw
-    for name in ("identity-token0", "identity-token1", "identity-factory",
-                 f"block-{START}", f"block-{END}"):
+    identities = {"identity-token0": "6982508145454ce325ddbe47a25d4ec3d2311933",
+                  "identity-token1": "c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+                  "identity-factory": "5c69bee701ef814a2b6a3edd4b1652cb9cc5aa6f"}
+    for name, expected in identities.items():
+        if read(name).lower() != "0x" + expected.zfill(64):
+            raise ValueError(f"Unexpected pool identity: {name}")
+    for name in (f"block-{START}", f"block-{END}"):
         read(name)
     swaps, profile = decode(read)
     for seq in structural_candidates(swaps):
@@ -165,18 +170,20 @@ def preflight(read=None):
 
 
 def main():
-    global OUTPUT, SOURCE
+    global OUTPUT, SOURCE, DATA, RAW
     parser = argparse.ArgumentParser()
     parser.add_argument("--inventory-bps", type=int, choices=[0, 1], default=0)
     parser.add_argument("--source", choices=["archive", "raw"], default="archive")
+    parser.add_argument("--data-dir", type=Path, default=DATA,
+                        help="Evidence and output directory (used to verify a staged archive)")
     args = parser.parse_args()
     SOURCE = args.source
+    DATA = args.data_dir.resolve()
+    RAW, OUTPUT = DATA / "raw", DATA
+    archive.cache_clear()
     if args.inventory_bps:
         OUTPUT = DATA / "sensitivity-1bp"
         OUTPUT.mkdir(exist_ok=True)
-    assert raw("identity-token0")[-40:] == "6982508145454ce325ddbe47a25d4ec3d2311933"
-    assert raw("identity-token1")[-40:] == "c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
-    assert raw("identity-factory")[-40:] == "5c69bee701ef814a2b6a3edd4b1652cb9cc5aa6f"
     swaps, profile = preflight()
     candidates = structural_candidates(swaps)
     episodes, victims, screening = [], [], []
