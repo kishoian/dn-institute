@@ -77,6 +77,25 @@ class EvidenceRegressionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "checksum mismatch"):
             evidence.load_archive(self.data)
 
+    def test_inventory_accepts_exact_snapshot_and_rejects_stale_extras(self):
+        data = Path(analyze.__file__).resolve().parent / "data"
+        records = evidence.load_archive(data)
+        case = json.loads((data / "summary.json").read_text())["spot_check"]
+        pack_evidence.validate_inventory(records, case)
+        for name in ("unrelated-logs", f"block-{analyze.START-2}",
+                     "verify-receipt-0x" + "ab" * 32):
+            with self.subTest(name=name):
+                with self.assertRaisesRegex(ValueError, "Unexpected evidence records"):
+                    pack_evidence.validate_inventory({**records, name: envelope([])}, case)
+
+    def test_inventory_requires_retained_boundary_header(self):
+        data = Path(analyze.__file__).resolve().parent / "data"
+        records = evidence.load_archive(data)
+        case = json.loads((data / "summary.json").read_text())["spot_check"]
+        del records[f"block-{analyze.START-1}"]
+        with self.assertRaisesRegex(ValueError, "Missing required evidence record: block-"):
+            pack_evidence.validate_inventory(records, case)
+
     def test_duplicate_names_rejected_even_with_matching_checksum(self):
         row = {"name": "sample", "response": envelope([])}
         self.write_archive([row, row])

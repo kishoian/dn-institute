@@ -8,10 +8,31 @@ from pathlib import Path
 import tempfile
 import subprocess
 import sys
+import analyze
 from evidence import checked_result, load_archive, named_result, publish_snapshot, verify_second_provider
 
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "data"
+
+
+def validate_inventory(records, case):
+    """Allow exactly the configured collection and actual replay dependencies."""
+    expected = set()
+
+    def read(name):
+        expected.add(name)
+        return named_result(records, name)
+
+    analyze.preflight(read)
+    # The collector retains the preceding boundary header for provenance even
+    # though the reserve replay is initialized from initial-sync-logs.
+    read(f"block-{analyze.START-1}")
+    verify_second_provider(read, case)
+    unexpected = sorted(set(records) - expected)
+    if unexpected:
+        raise ValueError(f"Unexpected evidence records ({len(unexpected)}): "
+                         + ", ".join(unexpected[:10])
+                         + "; use a clean raw cache for this collection")
 
 
 def main():
@@ -51,7 +72,7 @@ def main():
             raise ValueError("Staged evidence is not replayable: " + replay.stderr[-2000:])
         records = load_archive(staging)
         case = json.loads((staging / "summary.json").read_text())["spot_check"]
-        verify_second_provider(lambda name: named_result(records, name), case)
+        validate_inventory(records, case)
         manifest = publish_snapshot(staging, DATA)
     print(json.dumps(manifest, indent=2))
 

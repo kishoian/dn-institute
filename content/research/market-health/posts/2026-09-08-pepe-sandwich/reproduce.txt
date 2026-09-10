@@ -94,6 +94,11 @@ the preflight and replay paths. Staging cannot modify the published CSV outputs.
 Publication also requires the three second-provider receipts selected by the
 staged replay, comparing gasUsed and effectiveGasPrice as well as event and block
 fields. Collector cache reuse uses the same method-specific envelope validator.
+The record inventory must match the configured log ranges, token identities,
+boundary headers (including START-1), structural-candidate transaction/receipt
+dependencies and the three selected verification receipts exactly. Valid but
+unrelated leftovers are rejected before publication; no fixed record-count
+constant is used when adapting the study to another range.
 Changed snapshots receive immutable, SHA-256-named archive files; only the
 manifest pointer is replaced atomically. An interruption before that switch
 leaves the previous manifest and archive usable. Previous archives are retained;
